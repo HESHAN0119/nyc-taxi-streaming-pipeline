@@ -1,0 +1,203 @@
+# NYC taxi streaming pipeline
+#   docker compose up -d       start
+#   docker compose down        stop (data kept)
+#   docker compose down -v     stop and delete data
+
+name: taxi-stream
+
+x-kafka-common: &kafka-common
+  image: apache/kafka:${KAFKA_VERSION:-3.9.1}
+  restart: always
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+    interval: 10s
+    timeout: 20s
+    retries: 12
+    start_period: 20s
+
+# 3 nodes, each one broker + controller (KRaft, no zookeeper)
+# ports: 9092 internal, 9093 controller, N9092 from the host
+x-kafka-env: &kafka-env
+  CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+  KAFKA_PROCESS_ROLES: broker,controller
+  KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+  KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+  KAFKA_LOG_DIRS: /var/lib/kafka/data
+  KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+  KAFKA_MIN_INSYNC_REPLICAS: 2
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+  KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topic is created by kafka-init
+  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+  KAFKA_HEAP_OPTS: -Xms512m -Xmx512m
+
+services:
+  kafka-1:
+    <<: *kafka-common
+    container_name: kafka-1
+    hostname: kafka-1
+    ports:
+      - "19092:19092"
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-1:9092,EXTERNAL://localhost:19092
+    volumes:
+      - kafka-1-data:/var/lib/kafka/data
+
+  kafka-2:
+    <<: *kafka-common
+    container_name: kafka-2
+    hostname: kafka-2
+    ports:
+      - "29092:29092"
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-2:9092,EXTERNAL://localhost:29092
+    volumes:
+      - kafka-2-data:/var/lib/kafka/data
+
+  kafka-3:
+    <<: *kafka-common
+    container_name: kafka-3
+    hostname: kafka-3
+    ports:
+      - "39092:39092"
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 3
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:39092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-3:9092,EXTERNAL://localhost:39092
+    volumes:
+      - kafka-3-data:/var/lib/kafka/data
+
+  # creates the topic, then exits
+  kafka-init:
+    image: apache/kafka:${KAFKA_VERSION:-3.9.1}
+    container_name: kafka-init
+    depends_on:
+      kafka-1: { condition: service_healthy }
+      kafka-2: { condition: service_healthy }
+      kafka-3: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        BOOTSTRAP=kafka-1:9092,kafka-2:9092,kafka-3:9092
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BOOTSTRAP --create --if-not-exists \
+          --topic ${TOPIC_NAME} \
+          --partitions ${TOPIC_PARTITIONS} \
+          --replication-factor 3 \
+          --config min.insync.replicas=2 \
+          --config retention.ms=604800000
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BOOTSTRAP --describe --topic ${TOPIC_NAME}
+
+  # init.sql runs only on the first start
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-25.8}
+    container_name: clickhouse
+    restart: always
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # python apps (same image); inside docker they use container names, not localhost
+  producer:
+    build: { context: ., dockerfile: app/Dockerfile }
+    image: taxi-stream-app:latest
+    container_name: producer
+    command: ["python", "app/producer.py"]
+    env_file: .env
+    environment: &app-addresses
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_HTTP_PORT: 8123
+      WATCH_POLLING: "true"   # file events don't reach containers on windows
+    volumes:
+      - ./data:/opt/taxi/data
+      - ./logs:/opt/taxi/logs
+    ports:
+      - "${PRODUCER_METRICS_PORT:-8000}:${PRODUCER_METRICS_PORT:-8000}"
+    stop_signal: SIGINT       # stop cleanly
+    stop_grace_period: 30s
+    restart: always
+    depends_on:
+      kafka-init: { condition: service_completed_successfully }
+
+  processor:
+    image: taxi-stream-app:latest
+    container_name: processor
+    command: ["python", "app/processor.py"]
+    env_file: .env
+    environment: *app-addresses
+    volumes:
+      - ./logs:/opt/taxi/logs
+    ports:
+      - "${PROCESSOR_METRICS_PORT:-8001}:${PROCESSOR_METRICS_PORT:-8001}"
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+    restart: always
+    depends_on:
+      kafka-init: { condition: service_completed_successfully }
+      clickhouse: { condition: service_healthy }
+      producer: { condition: service_started }   # producer builds the image
+
+  # monitoring: grafana http://localhost:3000, prometheus http://localhost:9090
+  kafka-exporter:   # kafka metrics (brokers, lag, replicas)
+    image: danielqsj/kafka-exporter:v1.9.0
+    container_name: kafka-exporter
+    command: ["--kafka.server=kafka-1:9092", "--kafka.server=kafka-2:9092", "--kafka.server=kafka-3:9092"]
+    restart: always
+    depends_on:
+      kafka-init: { condition: service_completed_successfully }
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: always
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/taxi_pipeline.json
+    volumes:
+      - ./monitoring/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./monitoring/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/grafana/taxi_pipeline.json:/var/lib/grafana/dashboards/taxi_pipeline.json:ro
+    restart: always
+    depends_on: [prometheus]
+
+volumes:
+  kafka-1-data:
+  kafka-2-data:
+  kafka-3-data:
+  clickhouse-data:

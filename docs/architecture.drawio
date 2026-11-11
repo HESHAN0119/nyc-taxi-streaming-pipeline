@@ -1,0 +1,186 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="taxi-stream" name="Architecture">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1460" pageHeight="860" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- title -->
+        <mxCell id="title" value="&lt;b&gt;NYC Taxi Streaming Pipeline&lt;/b&gt;" style="text;html=1;fontSize=20;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- groups (background) -->
+        <mxCell id="g_host" value="Windows host" style="rounded=1;arcSize=3;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;verticalAlign=top;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="20" y="60" width="230" height="570" as="geometry" />
+        </mxCell>
+        <mxCell id="g_docker" value="Docker Compose (project taxi-stream)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#eef5fb;strokeColor=#6c8ebf;dashed=1;verticalAlign=top;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="270" y="60" width="1170" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="g_kafka" value="Kafka cluster (KRaft, 3 brokers)" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="240" width="250" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="g_ch" value="ClickHouse (database taxi_stream)" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="200" width="370" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="g_mon" value="Monitoring" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="680" width="900" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- host -->
+        <mxCell id="raw" value="&lt;b&gt;data/raw&lt;/b&gt;&lt;br&gt;yellow_tripdata_2023-01.parquet&lt;br&gt;(downloaded by setup.sh)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="copy" value="&lt;b&gt;scripts/copy_5min.py&lt;/b&gt;&lt;br&gt;split 2023-01-01 by dropoff time&lt;br&gt;into 5 minute files" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="five" value="&lt;b&gt;data/5min/2023-01-01&lt;/b&gt;&lt;br&gt;288 parquet files" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="daily" value="&lt;b&gt;data/daily&lt;/b&gt;&lt;br&gt;watched folder" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="430" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sent" value="&lt;b&gt;data/sent_files.json&lt;/b&gt;&lt;br&gt;files already sent" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="540" width="190" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- producer -->
+        <mxCell id="producer" value="&lt;b&gt;producer.py&lt;/b&gt;&lt;br&gt;watchdog on data/daily&lt;br&gt;sort by dropoff time&lt;br&gt;10-50 rows/s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="300" y="410" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- kafka -->
+        <mxCell id="topic" value="&lt;b&gt;topic taxi-trips-stream&lt;/b&gt;&lt;br&gt;6 partitions, replication 3&lt;br&gt;min.insync.replicas 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="540" y="280" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="k1" value="kafka-1 :19092" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="540" y="380" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="k2" value="kafka-2 :29092" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="540" y="425" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="k3" value="kafka-3 :39092" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="540" y="470" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="kinit" value="kafka-init&lt;br&gt;(creates the topic)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;dashed=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="160" width="170" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- processor -->
+        <mxCell id="processor" value="&lt;b&gt;processor.py&lt;/b&gt;&lt;br&gt;batch: 500 rows or 5 s&lt;br&gt;clean (Assignment 1 rules)&lt;br&gt;commit every 5 min" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="820" y="270" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="window" value="&lt;b&gt;sliding_window.py&lt;/b&gt;&lt;br&gt;10 min windows every 5 min&lt;br&gt;watermark = newest - 2 min&lt;br&gt;late trips not counted" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="820" y="450" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="rejpy" value="&lt;b&gt;rejected.py&lt;/b&gt;&lt;br&gt;bad trips + reason" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="820" y="160" width="190" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- clickhouse -->
+        <mxCell id="rejtbl" value="&lt;b&gt;rejected_trips&lt;/b&gt;&lt;br&gt;raw JSON + reason" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=8;fillColor=#ffffff;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="235" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="fact" value="&lt;b&gt;fact_taxi_trips&lt;/b&gt;&lt;br&gt;one row per clean trip (dedup by trip_id)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=8;fillColor=#ffffff;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="315" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="agg" value="&lt;b&gt;trip_window_agg&lt;/b&gt;&lt;br&gt;window totals per zone (upsert by version)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=8;fillColor=#ffffff;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="420" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="view" value="&lt;b&gt;v_window_latest&lt;/b&gt;&lt;br&gt;view: latest window + averages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="520" width="330" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- monitoring -->
+        <mxCell id="exporter" value="&lt;b&gt;kafka-exporter&lt;/b&gt; :9308&lt;br&gt;brokers, lag, replicas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="545" y="730" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="prom" value="&lt;b&gt;Prometheus&lt;/b&gt; :9090&lt;br&gt;scrapes every 5 s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="820" y="730" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana" value="&lt;b&gt;Grafana&lt;/b&gt; :3000&lt;br&gt;dashboard Taxi Stream Pipeline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="730" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- data flow edges -->
+        <mxCell id="e1" value="read" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="raw" target="copy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="write" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="copy" target="five">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="next 4 files, 10 s apart" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="five" target="daily">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="new file" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="daily" target="producer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="check / save name" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;startArrow=block;dashed=1;fontSize=11;" edge="1" parent="1" source="producer" target="sent">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="390" y="570" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="JSON, key = pickup zone&lt;br&gt;acks=all, idempotent" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="producer" target="topic">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="390" y="315" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="creates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;dashed=1;fontSize=11;" edge="1" parent="1" source="kinit" target="topic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="group taxi-processor" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="topic" target="processor">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="bad trips" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="processor" target="rejpy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="insert" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="rejpy" target="rejtbl">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="clean trips" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="processor" target="fact">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="same batch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="processor" target="window">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="every 5 min: upsert" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeWidth=2;fontSize=11;" edge="1" parent="1" source="window" target="agg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="load open windows at start" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;dashed=1;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="agg" target="window">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1235" y="500" /><mxPoint x="1030" y="500" /><mxPoint x="1030" y="560" /><mxPoint x="915" y="560" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;dashed=1;" edge="1" parent="1" source="agg" target="view">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- metrics edges -->
+        <mxCell id="m1" value=":8000/metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;dashed=1;strokeColor=#b85450;fontColor=#b85450;fontSize=11;" edge="1" parent="1" source="producer" target="prom">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="390" y="650" /><mxPoint x="915" y="650" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m2" value=":8001/metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;dashed=1;strokeColor=#b85450;fontColor=#b85450;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="processor" target="prom">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1030" y="315" /><mxPoint x="1030" y="660" /><mxPoint x="960" y="660" /></Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m3" value="cluster state" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;dashed=1;strokeColor=#b85450;fontColor=#b85450;fontSize=11;" edge="1" parent="1" source="k3" target="exporter">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m4" value=":9308/metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;dashed=1;strokeColor=#b85450;fontColor=#b85450;fontSize=11;" edge="1" parent="1" source="exporter" target="prom">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m5" value="queries" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#b85450;fontColor=#b85450;fontSize=11;" edge="1" parent="1" source="prom" target="grafana">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- legend -->
+        <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;thick line = data flow&lt;br&gt;dashed black = state / control&lt;br&gt;dashed red = metrics" style="text;html=1;align=left;verticalAlign=top;fontSize=11;strokeColor=#999999;fillColor=#ffffff;rounded=1;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="20" y="660" width="230" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

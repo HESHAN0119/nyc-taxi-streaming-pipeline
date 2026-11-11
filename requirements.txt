@@ -1,0 +1,6 @@
+kafka-python
+pyarrow
+prometheus-client
+clickhouse-connect
+python-dotenv
+watchdog

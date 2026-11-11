@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: producer
+    static_configs:
+      - targets: ["producer:8000"]
+    # drop library metrics we don't use
+    metric_relabel_configs: &drop
+      - source_labels: [__name__]
+        regex: "(go|python|process|promhttp)_.*|.*_created"
+        action: drop
+
+  - job_name: processor
+    static_configs:
+      - targets: ["processor:8001"]
+    metric_relabel_configs: *drop
+
+  - job_name: kafka
+    static_configs:
+      - targets: ["kafka-exporter:9308"]
+    metric_relabel_configs: *drop

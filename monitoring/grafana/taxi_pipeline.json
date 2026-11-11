@@ -1,0 +1,113 @@
+{
+  "id": null,
+  "uid": "taxi-stream",
+  "title": "Taxi Stream Pipeline",
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Kafka brokers online",
+      "gridPos": { "h": 5, "w": 3, "x": 0, "y": 0 },
+      "targets": [ { "refId": "A", "expr": "kafka_brokers" } ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Under-replicated partitions",
+      "description": "Partitions missing a copy. Should be 0.",
+      "gridPos": { "h": 5, "w": 3, "x": 3, "y": 0 },
+      "targets": [ { "refId": "A", "expr": "sum(kafka_topic_partition_under_replicated_partition{topic=\"taxi-trips-stream\"})" } ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Sent by producer",
+      "gridPos": { "h": 5, "w": 3, "x": 6, "y": 0 },
+      "targets": [ { "refId": "A", "expr": "sum(last_over_time(producer_events_sent_total{file!=\"\"}[1d]))" } ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Read by processor",
+      "gridPos": { "h": 5, "w": 3, "x": 9, "y": 0 },
+      "targets": [ { "refId": "A", "expr": "sum(last_over_time(processor_events_consumed_total{file!=\"\"}[1d]))" } ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Inserted into ClickHouse",
+      "gridPos": { "h": 5, "w": 3, "x": 12, "y": 0 },
+      "targets": [ { "refId": "A", "expr": "sum(last_over_time(processor_rows_inserted_total{file!=\"\"}[1d]))" } ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Not inserted (bad rows)",
+      "gridPos": { "h": 5, "w": 3, "x": 15, "y": 0 },
+      "fieldConfig": { "defaults": { "noValue": "0" } },
+      "targets": [ { "refId": "A", "expr": "sum(last_over_time(processor_events_rejected_total{file!=\"\"}[1d]))" } ]
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Late trips (24h)",
+      "description": "Trips older than the watermark: stored, not counted in windows.",
+      "gridPos": { "h": 5, "w": 3, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "noValue": "0", "decimals": 0 } },
+      "targets": [ { "refId": "A", "expr": "sum(increase(processor_late_events_total[1d]))" } ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Waiting in Kafka (consumer lag)",
+      "gridPos": { "h": 5, "w": 3, "x": 21, "y": 0 },
+      "targets": [ { "refId": "A", "expr": "sum(kafka_consumergroup_lag{consumergroup=\"taxi-processor\"})" } ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Per file",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+      "fieldConfig": { "defaults": { "noValue": "0" } },
+      "targets": [
+        { "refId": "A", "instant": true, "format": "table", "expr": "sum by (file) (last_over_time(producer_file_rows{file!=\"\"}[1d]))" },
+        { "refId": "B", "instant": true, "format": "table", "expr": "sum by (file) (last_over_time(producer_events_sent_total{file!=\"\"}[1d]))" },
+        { "refId": "C", "instant": true, "format": "table", "expr": "sum by (file) (last_over_time(processor_events_consumed_total{file!=\"\"}[1d]))" },
+        { "refId": "D", "instant": true, "format": "table", "expr": "sum by (file) (last_over_time(processor_rows_inserted_total{file!=\"\"}[1d]))" },
+        { "refId": "E", "instant": true, "format": "table", "expr": "sum by (file) (last_over_time(processor_events_rejected_total{file!=\"\"}[1d]))" }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": {
+              "file": "File",
+              "Value #A": "Rows in file",
+              "Value #B": "Sent by producer",
+              "Value #C": "Read by processor",
+              "Value #D": "Inserted",
+              "Value #E": "Not inserted"
+            }
+          }
+        },
+        { "id": "sortBy", "options": { "sort": [ { "field": "File", "desc": true } ] } }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Throughput (rows per second)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(producer_events_sent_total[1m]))", "legendFormat": "sent by producer" },
+        { "refId": "B", "expr": "sum(rate(processor_events_consumed_total[1m]))", "legendFormat": "read by processor" },
+        { "refId": "C", "expr": "sum(rate(processor_rows_inserted_total[1m]))", "legendFormat": "inserted" }
+      ]
+    }
+  ]
+}

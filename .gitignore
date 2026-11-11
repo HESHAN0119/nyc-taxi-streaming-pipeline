@@ -1,0 +1,10 @@
+# Downloaded data (re-creatable via setup.sh)
+data/raw/
+data/daily/
+data/5min/
+data/sent_files.json
+.venv/
+venv/
+__pycache__/
+.env
+logs/

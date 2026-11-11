@@ -1,0 +1,7 @@
+# load dashboards from this folder on start
+apiVersion: 1
+providers:
+  - name: taxi-stream
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

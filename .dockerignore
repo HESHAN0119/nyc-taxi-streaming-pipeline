@@ -1,0 +1,7 @@
+# Keep the build context small: the image only needs requirements.txt and app/
+.venv/
+data/
+.env
+.git/
+**/__pycache__/
+logs/
